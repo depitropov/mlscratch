@@ -7,7 +7,7 @@ setup(name='mlscratch',
       author='Dimitar Epitropov',
       author_email='depitropov@gmail.com',
       license='MIT',
-      packages=['mlscratch'],
+      packages=['mlscratch', 'mlscratch.classification'],
       zip_safe=False,
       install_requires=[
           'numpy'
