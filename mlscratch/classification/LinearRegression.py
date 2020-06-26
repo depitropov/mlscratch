@@ -3,15 +3,18 @@ import numpy as np
 
 class LinearRegression:
 
-    def __init__(self, algorithm):
-        self.algorithm = algorithm
+    def __init__(self, normalize=True):
         self.parameters = None
+        self.normalize = normalize
 
     def train(self, features, target, alpha, iterations):
         self.parameters = self._gradient_descent(features, target, alpha, iterations)
 
     def predict(self, features):
         result = []
+        if self.normalize:
+            features = self._normalize(features)
+        features = np.c_[np.ones((features.shape[0], 1)), features]
         for i in range(features.shape[0]):
             result.append(features[i].dot(self.parameters))
         return result
@@ -28,10 +31,19 @@ class LinearRegression:
             result = result + (features[i].dot(parameters) - targets[i]) * features[i][parameter]
         return features.shape[0] / 2 * result
 
+    def _normalize(self, array):
+        array_max = np.max(array, axis=0)
+        array_min = np.min(array, axis=0)
+        array_max_min = array_max - array_min
+
+        return (array - array_min) / array_max_min
+
     def _gradient_descent(self, features, targets, alpha, iterations):
+        if self.normalize:
+            features = self._normalize(features)
         features = np.c_[np.ones((features.shape[0], 1)), features]
-        current_parameters = np.ones((features.shape[1], 1))
-        temp_parameters = np.ones((features.shape[1], 1))
+        current_parameters = np.zeros((features.shape[1], 1))
+        temp_parameters = np.zeros((features.shape[1], 1))
         previous_error = 0
 
         for j in range(iterations):
