@@ -1,95 +1,151 @@
 import numpy as np
 
 from mlscratch.commons.algorithms import Minimization, Scaling
+from mlscratch.commons.functions import Activation
 
 
 class LogisticRegression:
 
-    def __init__(self, normalize=True, algorithm='gd'):
+    def __init__(self, normalize=True):
         self.parameters = None
         self.normalize = normalize
 
-        if algorithm not in ('gd', 'norm'):
-            raise Exception("Algorithms must be either gd for GradientDescent or norm for Normal equation")
+    def train(self, features, targets, alpha=0.0005, iterations=2000):
+        self.parameters = self._vectorized_gradient_descent(features, targets, alpha, iterations)
 
-        self.algorithm = algorithm
+    def train2(self, features, targets, alpha, iterations):
+        if self.normalize:
+            features = Scaling.normalize(features)
+        cost_history = []
+        features = Scaling.add_identity_column(features)
+        weights = np.zeros((features.shape[1], 1))
 
-    def train(self, features, target, alpha=0.0005, iterations=2000):
-        if self.algorithm == 'gd':
-            self.parameters = Minimization.gradient_descent(features, target, self._calculate_error,
-                                                            self._calculate_slope, alpha, iterations)
-        elif self.algorithm == 'norm':
-            self.parameters = self._normal_equation(features, target)
+        for i in range(iterations):
+            weights = LogisticRegression.update_weights(features, targets, weights, alpha)
+
+            # Calculate error for auditing purposes
+            cost = LogisticRegression._cost_function2(weights, features, targets)
+            cost_history.append(cost)
+
+            # Log Progress
+            if i % 1000 == 0:
+                print("iter: " + str(i) + " cost: " + str(cost))
+
+        self.parameters = weights
 
     def predict(self, features):
-        # TODO: Improve and check input
-        result = []
         if self.normalize:
             features = Scaling.normalize(features)
         features = Scaling.add_identity_column(features)
-        for i in range(features.shape[0]):
-            result.append(features[i].dot(self.parameters))
-        return result
+        return LogisticRegression._hypothesis(self.parameters, features)
 
-    def _normal_equation(self, features, targets):
+    @staticmethod
+    def predict2(weights, features):
+        '''
+        Returns 1D array of probabilities
+        that the class label == 1
+        '''
+        z = np.dot(features, weights)
+        return Activation.sigmoid(z)
+
+    def predict3(self, features):
+        '''
+        Returns 1D array of probabilities
+        that the class label == 1
+        '''
         if self.normalize:
             features = Scaling.normalize(features)
-            targets = Scaling.normalize(targets)
         features = Scaling.add_identity_column(features)
+        z = np.dot(features, self.parameters)
+        return Activation.sigmoid(z)
 
-        return np.linalg.pinv((features.T.dot(features))).dot(features.T.dot(targets))
-
-    @staticmethod
-    def sigmoid(z):
-        return 1.0 / (1 + np.exp(-z))
-
-    @staticmethod
-    def cost_function(parameters, features, targets):
-        return 1
-
-    @staticmethod
-    def gradient_descent(features, targets, error_algorithm, slope_algorithm, alpha=0.0005, iterations=2000, normalize=True):
-        if normalize:
+    def _vectorized_gradient_descent(self, features, targets, alpha=0.0005, iterations=2000):
+        if self.normalize:
             features = Scaling.normalize(features)
         features = Scaling.add_identity_column(features)
-        current_parameters = np.zeros((features.shape[1], 1))
-        temp_parameters = np.zeros((features.shape[1], 1))
+        parameters = np.zeros((features.shape[1], 1))
         previous_error = 0
 
         for j in range(iterations):
-            total_error = 0
-
-            current_parameters = current_parameters - (alpha / features.shape[0]).dot(
-                LogisticRegression.cost_function()
+            parameters = parameters - (alpha / features.shape[0]) * (
+                features.T.dot(LogisticRegression._hypothesis(parameters, features) - targets)
             )
 
-            for parameter in range(current_parameters.shape[0]):
-                if j % 100 == 0:
-                    error = error_algorithm(current_parameters, features, targets)
-                    total_error = total_error + error
-                slope = slope_algorithm(current_parameters, features, targets, parameter)
-                temp_parameters[parameter] = current_parameters[parameter] - alpha * slope
-            current_parameters = temp_parameters
             if j % 100 == 0:
-                if abs(total_error - previous_error) < 0.0001:
-                    return current_parameters
-                previous_error = total_error
-                print('>iteration=%d,, error=%.3f' % (j, total_error))
-        return current_parameters
+                error = LogisticRegression._cost_function(parameters, features, targets)
+                if abs(error - previous_error) < 0.0001:
+                    return parameters
+                previous_error = error
+                print('>iteration=%d, error=%.3f' % (j, error))
 
-
-    @staticmethod
-    def _calculate_error(parameters, features, targets):
-        result = 0
-        for i in range(features.shape[0]):
-            result = result + (features[i].dot(parameters) - targets[i]) ** 2
-        return result / features.shape[0]
+        return parameters
 
     @staticmethod
-    def _calculate_slope(parameters, features, targets, parameter):
-        result = 0
-        for i in range(features.shape[0]):
-            result = result + (features[i].dot(parameters) - targets[i]) * features[i][parameter]
-        return features.shape[0] / 2 * result
+    def _hypothesis(parameters, features):
+        return Activation.sigmoid(features.dot(parameters))
 
+    @staticmethod
+    def _cost_function(parameters, features, targets):
+        return np.sum(-targets * (np.log(LogisticRegression._hypothesis(parameters, features)) - (1 - targets) * (
+            np.log(1 - LogisticRegression._hypothesis(parameters, features))))) / features.shape[0]
 
+    @staticmethod
+    def _cost_function2(weights, features, labels):
+        '''
+        Using Mean Absolute Error
+
+        Features:(100,3)
+        Labels: (100,1)
+        Weights:(3,1)
+        Returns 1D matrix of predictions
+        Cost = (labels*log(predictions) + (1-labels)*log(1-predictions) ) / len(labels)
+        '''
+        observations = len(labels)
+
+        predictions = LogisticRegression.predict2(weights, features)
+
+        # Take the error when label=1
+        class1_cost = -labels * np.log(predictions)
+
+        # Take the error when label=0
+        class2_cost = (1 - labels) * np.log(1 - predictions)
+
+        # Take the sum of both costs
+        cost = class1_cost - class2_cost
+
+        # Take the average cost
+        cost = cost.sum() / observations
+
+        return cost
+
+    @staticmethod
+    def update_weights(features, labels, weights, lr):
+        '''
+        Vectorized Gradient Descent
+
+        Features:(200, 3)
+        Labels: (200, 1)
+        Weights:(3, 1)
+        '''
+        N = len(features)
+
+        #1 - Get Predictions
+        predictions = LogisticRegression.predict2(weights, features)
+
+        #2 Transpose features from (200, 3) to (3, 200)
+        # So we can multiply w the (200,1)  cost matrix.
+        # Returns a (3,1) matrix holding 3 partial derivatives --
+        # one for each feature -- representing the aggregate
+        # slope of the cost function across all observations
+        gradient = np.dot(features.T,  predictions - labels)
+
+        #3 Take the average cost derivative for each feature
+        gradient /= N
+
+        #4 - Multiply the gradient by our learning rate
+        gradient *= lr
+
+        #5 - Subtract from our weights to minimize cost
+        weights -= gradient
+
+        return weights
