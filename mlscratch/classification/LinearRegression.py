@@ -9,7 +9,7 @@ class LinearRegression:
         self.parameters = None
         self.normalize = normalize
 
-        if algorithm not in ('gd', 'norm'):
+        if algorithm not in ('gd', 'gd_vectorized', 'norm'):
             raise Exception("Algorithms must be either gd for GradientDescent or norm for Normal equation")
 
         self.algorithm = algorithm
@@ -20,6 +20,9 @@ class LinearRegression:
                                                                        self._calculate_slope, alpha, iterations)
         elif self.algorithm == 'norm':
             self.parameters = self._normal_equation(features, target)
+
+        elif self.algorithm == 'gd_vectorized':
+            self.parameters = self._vectorized_gradient_descent(features, target, alpha=0.0005, iterations=2000)
 
     def predict(self, features):
         if self.normalize:
@@ -35,7 +38,7 @@ class LinearRegression:
     def _cost_function(parameters, features, targets):
         return np.sum((LinearRegression._hypothesis(parameters, features) - targets) ** 2) / features.shape[0]
 
-    def _vectorized_gradient_descent(self, features, target, alpha=0.0005, iterations=2000):
+    def _vectorized_gradient_descent(self, features, targets, alpha=0.0005, iterations=2000):
         if self.normalize:
             features = Scaling.normalize(features)
         features = Scaling.add_identity_column(features)
@@ -43,16 +46,16 @@ class LinearRegression:
         previous_error = 0
 
         for j in range(iterations):
-            parameters = parameters - alpha * (features.T.dot(LinearRegression._hypothesis(features, parameters) - target))
+            parameters = parameters - alpha * (features.T.dot(LinearRegression._hypothesis(features, parameters) - targets) / features.shape[0] / 2)
 
             if j % 100 == 0:
-                if abs(total_error - previous_error) < 0.0001:
-                    return current_parameters
-                previous_error = total_error
-                print('>iteration=%d,, error=%.3f' % (j, total_error))
+                error = LinearRegression._cost_function(parameters, features, targets)
+                if abs(error - previous_error) < 0.0001:
+                    return parameters
+                previous_error = error
+                print('>iteration=%d,, error=%.3f' % (j, error))
 
-
-        return current_parameters
+        return parameters
 
     def _normal_equation(self, features, targets):
         if self.normalize:
