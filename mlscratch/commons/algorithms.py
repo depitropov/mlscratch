@@ -25,7 +25,7 @@ class Minimization:
                 if abs(total_error - previous_error) < 0.0001:
                     return current_parameters
                 previous_error = total_error
-                print('>iteration=%d,, error=%.3f' % (j, total_error))
+                print('>iteration=%d, error=%.3f' % (j, total_error))
         return current_parameters
 
 
