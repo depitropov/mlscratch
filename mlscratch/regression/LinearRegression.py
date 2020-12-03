@@ -1,6 +1,6 @@
 import numpy as np
 
-from mlscratch.commons.algorithms import Minimization, Scaling
+from mlscratch.commons.algorithms import Scaling
 
 
 class LinearRegression:
@@ -9,21 +9,16 @@ class LinearRegression:
         self.parameters = None
         self.normalize = normalize
 
-        if algorithm not in ('gd', 'gd_vectorized', 'norm'):
-            raise Exception("Algorithms must be either 'gd' for GradientDescent, 'gd_vectorized' for "
-                            "Vectorized Gradient Descent or 'norm' for Normal equation")
+        if algorithm not in ('gd', 'norm'):
+            raise Exception("Algorithms must be either 'gd' for GradientDescent or 'norm' for Normal equation")
 
         self.algorithm = algorithm
 
     def train(self, features, target, alpha=0.0005, iterations=2000):
         if self.algorithm == 'gd':
-            self.parameters = Minimization.gradient_descent(features, target, self._calculate_error,
-                                                            self._calculate_slope, alpha, iterations)
+            self.parameters = self._vectorized_gradient_descent(features, target, alpha, iterations)
         elif self.algorithm == 'norm':
             self.parameters = self._normal_equation(features, target)
-
-        elif self.algorithm == 'gd_vectorized':
-            self.parameters = self._vectorized_gradient_descent(features, target, alpha, iterations)
 
     def predict(self, features):
         if self.normalize:
@@ -67,18 +62,3 @@ class LinearRegression:
     @staticmethod
     def _cost_function(parameters, features, targets):
         return np.sum((LinearRegression._hypothesis(parameters, features) - targets) ** 2) / features.shape[0]
-
-    @staticmethod
-    def _calculate_error(parameters, features, targets):
-        result = 0
-        for i in range(features.shape[0]):
-            result = result + (features[i].dot(parameters) - targets[i]) ** 2
-        return result / features.shape[0]
-
-    @staticmethod
-    def _calculate_slope(parameters, features, targets, parameter):
-        result = 0
-        for i in range(features.shape[0]):
-            result = result + (features[i].dot(parameters) - targets[i]) * features[i][parameter]
-
-        return result / features.shape[0] / 2
