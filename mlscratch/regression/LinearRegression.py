@@ -14,9 +14,9 @@ class LinearRegression:
 
         self.algorithm = algorithm
 
-    def train(self, features, target, alpha=0.0005, iterations=2000):
+    def train(self, features, target, alpha=0.0005, iterations=2000, regularization_term=0):
         if self.algorithm == 'gd':
-            self.parameters = self._vectorized_gradient_descent(features, target, alpha, iterations)
+            self.parameters = self._vectorized_gradient_descent(features, target, alpha, iterations, regularization_term)
         elif self.algorithm == 'norm':
             self.parameters = self._normal_equation(features, target)
 
@@ -26,15 +26,23 @@ class LinearRegression:
         features = Scaling.add_identity_column(features)
         return LinearRegression._hypothesis(self.parameters, features)
 
-    def _vectorized_gradient_descent(self, features, targets, alpha=0.0005, iterations=2000):
+    def _vectorized_gradient_descent(self, features, targets, alpha, iterations, regularization_term):
         if self.normalize:
             features = Scaling.normalize(features)
         features = Scaling.add_identity_column(features)
-        parameters = np.zeros((features.shape[1], 1))
+        parameters = np.zeros((features.shape[1], 1)) # Why do I use not a vector but a matrix of array with single arrays?
         previous_error = 0
 
+        regularization_vector = np.concatenate(
+            (np.zeros(1),
+             np.full(features.shape[1] - 1, regularization_term)), axis=0).reshape(-1, 1)
+
+
+        print("regularization_vector/features.shape[0]")
+        print(regularization_vector/features.shape[0])
+
         for j in range(iterations):
-            parameters = parameters - (alpha / features.shape[0] / 2) * (
+            parameters = parameters*(1-alpha*(regularization_vector/features.shape[0])) - (alpha / features.shape[0]) * (
                 features.T.dot(LinearRegression._hypothesis(parameters, features) - targets)
             )
 
